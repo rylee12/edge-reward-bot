@@ -23,49 +23,60 @@ class EdgeRewardBot():
         self.mobile_words = ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
                             "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen",
                             "nineteen", "twenty"]
+        self.mobile_emulation = {
+            "deviceName": "iPhone X"
+        }
                         
-    def set_up(self):
-        pass
-
-    def start(self):
-        options = EdgeOptions()
-        options.use_chromium = True
+    def _setup_options(self, options, type: str):
         options.add_argument(self.profile_path)
+        if type == "desktop":
+            options.use_chromium = True
+        
+        if type == "mobile":
+            options.add_experimental_option("mobileEmulation", self.mobile_emulation)
+
+    def desktop_search(self):
+        options = EdgeOptions()
+        self._setup_options(options, "desktop")
         driver = Edge(executable_path=self.msedge_path, options=options)
-        driver.get("https://www.bing.com/search")
-        sleep(1)
         # 2 solutions, insert query string or go to element
         for item in self.edge_words:
             driver.get(f"https://www.bing.com/search?q={item}")
             sleep(1)
 
-        sleep(10)
+        sleep(5)
         driver.quit()
 
     # test if mobile works for edge. Doesn't crash, but not sure
-    def mobile(self):
-        mobile_emulation = {
-            "deviceName": "iPhone X"
-        }
+    def mobile_search(self):
         options = Options()
-        options.add_experimental_option("mobileEmulation", mobile_emulation)
-        options.add_argument(self.profile_path)
+        self._setup_options(options, "mobile")
         driver = webdriver.Chrome(executable_path=self.chrome_path, options=options)
         for item in self.mobile_words:
             driver.get(f"https://www.bing.com/search?q={item}")
             sleep(1)
         
-        sleep(10)
+        sleep(5)
         driver.quit()
     
     def quiz(self):
-        pass
+        options = EdgeOptions()
+        self._setup_options(options, "desktop")
+        driver = Edge(executable_path=self.msedge_path, options=options)
+        sleep(2)
+        # replace xpath with class name for better readability
+        rewards = driver.find_element_by_xpath("/html/body/div[1]/div/fluent-design-system-provider/div[2]/div[1]/div[7]")
+        rewards.click()
+        sleep(10)
 
 
 # utility function for class stuff
 def do_stuff():
     pass
 
+
 if __name__=="__main__":
     browser = EdgeRewardBot()
-    browser.mobile()
+    browser.quiz()
+    #browser.desktop_search()
+    #browser.mobile_search()
