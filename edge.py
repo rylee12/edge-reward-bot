@@ -13,6 +13,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait as wait
 
 from time import sleep
+from enum import Enum
 import random
 
 from selenium.webdriver.support.wait import WebDriverWait
@@ -42,6 +43,12 @@ TEST_TIME = 3
 SHORT_WAIT = 5
 STANDARD_WAIT = 7
 LONG_WAIT = 10
+
+
+class SearchModes(Enum):
+    DESKTOP = 0
+    MOBILE = 1
+
 
 # Daily xpaths
 # mee-icon mee-icon-SkypeCircleCheck x-hidden-focus (Check mark for if task is done); 'mee-icon-AddMedium'
@@ -79,7 +86,39 @@ def desktop_search():
         driver.get(f"https://www.bing.com/search?q={item}")
         sleep(1)
 
+    driver.quit()
+
+
+# use this function to check points
+# *** All 3 points only differ by div number in xpath
+def test():
+    options = EdgeOptions()
+    setup_options(options, "desktop")
+
+    driver = Edge(executable_path=msedge_path, options=options)
+
+    driver.get(f"https://www.bing.com")
     sleep(3)
+
+    # //*[@id='msRewards']//button
+    button = driver.find_element_by_xpath("//*[@id='id_rh']")
+    button.click()
+    sleep(5)
+
+    iframe = driver.find_element_by_xpath("//*[@id='bepfm']")
+    driver.switch_to_frame(iframe)
+
+    desktop_points = driver.find_element_by_xpath("//*[@id='modern-flyout']/div/div[5]/div/div[2]/div[1]/div/div")
+    print(desktop_points.text)
+
+    edge_browser_points = driver.find_element_by_xpath("//*[@id='modern-flyout']/div/div[5]/div/div[2]/div[2]/div/div")
+    print(edge_browser_points.text)
+
+    mobile_points = driver.find_element_by_xpath("//*[@id='modern-flyout']/div/div[5]/div/div[2]/div[3]/div/div")
+    print(mobile_points.text)
+
+    driver.switch_to.default_content()
+
     driver.quit()
 
 
@@ -98,7 +137,6 @@ def mobile_search():
         driver.get(f"https://www.bing.com/search?q={item}")
         sleep(1)
     
-    sleep(3)
     driver.quit()
 
 
@@ -111,7 +149,16 @@ def daily_tasks():
     driver.get(dashboard_url2)
     sleep(1)
 
-    for i in range(3, 4):
+    # block of code for signing into bing rewards program for first time
+    """
+    sign_in = driver.find_elements_by_id("raf-signin-link-id")
+    if len(sign_in) > 0:
+        print("sign into stuff")
+        sign_in[0].click()
+        sleep(2)
+    """
+
+    for i in range(1, 4):
         offer = driver.find_element_by_xpath(f"//*[@id='daily-sets']/mee-card-group[1]/div/mee-card[{i}]/div/card-content/mee-rewards-daily-set-item-content/div")
         checked = offer.find_element_by_xpath("./a/mee-rewards-points/div/div/span[1]")
         title = offer.find_element_by_xpath("./a/div[2]/h3")
@@ -132,8 +179,16 @@ def daily_tasks():
 def start_quiz(driver):
     start_button = WebDriverWait(driver, 10).until(EC.visibility_of_element_located((By.ID, "rqStartQuiz"))) # start button
 
-    sleep(0.5)
+    sleep(SHORT_WAIT)
     start_button.click()
+
+
+def determine_type(driver):
+    overlay = len(driver.find_elements_by_id("btPollOverlay"))
+    print(overlay)
+    panel = len(driver.find_elements_by_id("ListOfQuestionAndAnswerPanes"))
+    print(panel)
+
 
 
 # change checked to complete?
@@ -155,6 +210,7 @@ def determine_task_card(driver, offer, title):
         multiple_answers(driver)
     elif title == "lightspeed quiz":
         print("light speed")
+        light_speed(driver)
     elif title == "test your smarts":
         print("smart test")
         page_quiz(driver)
@@ -165,6 +221,7 @@ def determine_task_card(driver, offer, title):
         poll_option(driver)
     elif title == "true or false":
         print("true or false")
+        multiple_choices(driver)
     elif title == "word for word":
         print("words")
         multiple_choices(driver)
@@ -173,6 +230,7 @@ def determine_task_card(driver, offer, title):
         multiple_choices(driver)
     else:
         print("general task")
+        sleep(SHORT_WAIT)
     
     driver.close()
     driver.switch_to.window(driver.window_handles[0])
@@ -197,8 +255,19 @@ def page_quiz(driver):
         option = driver.find_element_by_xpath(f"//*[@id='QuestionPane{i}']/div[1]/div[2]/a[{number}]/div/div/div/span[1]/span")
         option.click()
 
+        # /html/body/div[2]/main/ol/li[1]/div/div[2]/div/div[1]/div[2]/div[6]/a/div/span/input (Get score button)
+        # /html/body/div[2]/main/ol/li[1]/div/div[2]/div[1]/div[1]/div[2]/div[6]/a/div/span/input (Next question button)
+        # "b_focusLabel wk_rewards_promo"
         next = WebDriverWait(driver, 10).until(EC.visibility_of_element_located((By.XPATH, "/html/body/div[2]/main/ol/li[1]/div/div[2]/div[1]/div[1]/div[2]/div[6]/a/div/span/input")))
         next.click()
+    
+    sleep(SHORT_WAIT)
+    score = WebDriverWait(driver, 10).until(EC.visibility_of_element_located((By.XPATH, "/html/body/div[2]/main/ol/li[1]/div/div[2]/div/div[1]/div[2]/div[6]/a/div/span/input")))
+    score.click()
+
+    header_message = driver.find_element_by_class_name("b_focusLabel wk_rewards_promo")
+    print(header_message.text)
+    sleep(120)
 
 
 # While-loop, detect for the "you earned" message
@@ -216,11 +285,6 @@ def this_or_that(driver):
         print(progress)
 
         current, max = map(int, progress.split(" of "))
-        print(current)
-        print(max)
-
-        #points = driver.find_element_by_id("rqPoints").text
-        #print(points)
 
         # randint() or choice()
         number = random.randint(0, 1)
@@ -228,19 +292,58 @@ def this_or_that(driver):
         #question = WebDriverWait(driver, 10).until(EC.visibility_of_element_located((By.ID, f"rqAnswerOption{number}")))
         #question.click()
 
-        #sleep(5)
+        sleep(SHORT_WAIT)
 
         if current == max:
             print("end")
             header_message = WebDriverWait(driver, 10).until(EC.visibility_of_element_located((By.CLASS_NAME, "headerMessage_Refresh")))
+            print(header_message)
+            print("anything in header message?")
+
+            # get points from rqPoints element or from header message element
+            try:
+                print(header_message.text)
+                points = driver.find_element_by_class_name("rqECredits")
+                limit = driver.find_element_by_class_name("rqMCredits")
+            except:
+                print("failure")
+
             break
 
 
-def true_or_false(driver):
-    pass
+def start_overlay_quiz(driver):
+    start_button = WebDriverWait(driver, 10).until(EC.visibility_of_element_located((By.ID, "rqStartQuiz"))) # start button
+
+    sleep(SHORT_WAIT)
+    start_button.click()
 
 
+def get_current_progress(driver):
+    circles = driver.find_elements_by_xpath("//*[starts-with(@id, 'rqQuestionState')]")
+    current_progress = 0
+
+    # indicate which question user is currently on. Subtract by 1 to find out how many completed
+    if len(circles) > 0:
+        for circle in circles:
+            if circle.get_attribute("class") == "filledCircle":
+                current_progress += 1
+    
+    return current_progress
+
+
+def get_progress_length(driver):
+    circles = driver.find_elements_by_xpath("//*[starts-with(@id, 'rqQuestionState')]")
+    return len(circles)
+
+
+# track progress and then answer choices. Once all correct choices answered, wait and then check progress again, repeat
+# when progress is equal to number of circles, check if header message available. if not, then do questions again and then check again
 def multiple_answers(driver):
+    element = WebDriverWait(driver, 10).until(EC.visibility_of_element_located((By.ID, "rqStartQuiz"))) # start button
+
+    sleep(SHORT_WAIT)
+    element.click()
+
     circles = driver.find_elements_by_xpath("//*[starts-with(@id, 'rqQuestionState')]")
     current_progress = 0
 
@@ -250,7 +353,18 @@ def multiple_answers(driver):
             if circle.get_attribute("class") == "filledCircle":
                 current_progress += 1
 
-    print(current_progress)
+
+    progress = driver.find_element_by_class_name("btCorOps")
+    print(progress.text)
+    current, max = map(int, progress.text.split("/"))
+
+    answers = driver.find_elements_by_xpath("//*[starts-with(@id, 'rqAnswerOption')]")
+    #header_message = driver.find_elements_by_class_name("headerMessage_Refresh")
+    for answer in answers:
+        count = 0
+        answer.click()
+        sleep(2)    
+
 
 
 # Pick answer. If wrong, choose the right answer
@@ -264,48 +378,78 @@ def multiple_choices(driver):
     print(len(choices))
 
     try:
-        for number in range(0, len(choices) - 1):
-            #number = random.randint(0, 1)
-
+        for number in range(0, len(choices)):
             question = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, f"rqAnswerOption{number}")))  
             question.click()
 
             sleep(SHORT_WAIT)
 
-            header_message = driver.find_element_by_class_name("headerMessage_Refresh")
-            print(header_message)
-            print("anything in header message?")
-
-            if "you earned" in header_message.text.lower():
-                print("multiple choices done")
-                return True
+            # check if header_message exists. If it doesn't, then loop again
+            header_message = driver.find_elements_by_class_name("headerMessage_Refresh")
+            if len(header_message) > 0:
+                # TODO: detect the header message
+                print(header_message)
+                print("anything in header message?")
+                print(header_message[0].text)
     
     except:
         print("Error happened")
 
-    
+
+# difference is light speed has more than one question
+def light_speed(driver):
+    start_overlay_quiz(driver)
+    max = get_progress_length(driver)
+
+    while True:
+        progress = get_current_progress(driver)    
+        if progress == max:
+            print("progress done")
+            header_message = driver.find_elements_by_class_name("headerMessage_Refresh")
+            # if header_message is not there, then it will be an empty list
+
+            if len(header_message) > 0:
+                print("congrats, you are done")
+                break
+
+        choices = driver.find_elements_by_xpath("//*[starts-with(@id, 'rqAnswerOption')]")
+        random_choice = random.randint(0, 3)
+        choices[random_choice].click()
+        sleep(SHORT_WAIT)
 
 
 # Option 1: //*[@id="btoption0"]
 # Option 2: //*[@id="btoption1"]
 def poll_option(driver):
-    #driver.switch_to.window(driver.window_handles[-1])
     number = random.randint(0, 1)
 
     poll = driver.find_element_by_id(f"btoption{number}")
 
     sleep(SHORT_WAIT)
     poll.click()
-    #msg = driver.find_element_by_class_name("bt_headerMessage")
+
+    sleep(STANDARD_WAIT)
+    msg = driver.find_element_by_class_name("bt_headerMessage")
+    print("poll message")
+    print(msg)
+    print(msg.text)
+
+    if "earned" in msg.text:
+        print("earned in poll")
 
 
 
-# To do:
+# TODO:
+# Only do searches if there are points to earn
 # 1. Quizzes and daily tasks
-# 2. Wait until element loaded function
-# 3. Headless mode
-# 4. Functionality to check if we have max points
+# 2. Complete multiple_answers() function for supersonic quiz task
+# 3. Move all functions into a class object
+# 4. Move all common functions such as starting quiz and identifying tasks to other functions
+# 5. Use enums
+# Automate signing-up into microsoft account (optional)
+# End-game goal: AWS Lambda?
 if __name__=="__main__":
     #desktop_search()
     #mobile_search()
     daily_tasks()
+    #test()
