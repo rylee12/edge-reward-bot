@@ -1,4 +1,5 @@
 import re
+from typing import ClassVar
 from selenium import webdriver
 from msedge.selenium_tools import Edge, EdgeOptions
 
@@ -18,6 +19,9 @@ import random
 
 from selenium.webdriver.support.wait import WebDriverWait
 
+
+# https://www.reddit.com/r/MicrosoftRewards/comments/6a7m5w/only_50_points_per_day_for_search/
+# Microsoft rewards has different levels. Levels determine how many points u earn
 
 dashboard_url = "https://account.microsoft.com/rewards/"
 dashboard_url2 = "https://rewards.microsoft.com/"
@@ -84,13 +88,15 @@ def desktop_search():
 
     for item in edge_words:
         driver.get(f"https://www.bing.com/search?q={item}")
-        sleep(1)
+        #sleep(1)
 
     driver.quit()
 
 
 # use this function to check points
 # *** All 3 points only differ by div number in xpath
+# Check in increments of 50 points?
+# check levels
 def test():
     options = EdgeOptions()
     setup_options(options, "desktop")
@@ -106,7 +112,7 @@ def test():
     sleep(5)
 
     iframe = driver.find_element_by_xpath("//*[@id='bepfm']")
-    driver.switch_to_frame(iframe)
+    driver.switch_to.frame(iframe)
 
     desktop_points = driver.find_element_by_xpath("//*[@id='modern-flyout']/div/div[5]/div/div[2]/div[1]/div/div")
     print(desktop_points.text)
@@ -135,7 +141,6 @@ def mobile_search():
     
     for item in mobile_words:
         driver.get(f"https://www.bing.com/search?q={item}")
-        sleep(1)
     
     driver.quit()
 
@@ -171,7 +176,7 @@ def daily_tasks():
         if checked.get_attribute("class") == "mee-icon mee-icon-AddMedium" or checked.get_attribute("class") == "mee-icon mee-icon-HourGlass":
             determine_task_card(driver, offer, task_title)
         else:
-            print("false")
+            print("false (get rid of else statement)")
 
     sleep(5)
 
@@ -216,6 +221,7 @@ def determine_task_card(driver, offer, title):
         page_quiz(driver)
     elif title == "show what you know":
         print("show know")
+        page_quiz(driver)
     elif title == "daily poll" or title == "hot takes":
         print("poll")
         poll_option(driver)
@@ -241,6 +247,7 @@ def determine_task_card(driver, offer, title):
 # //*[@id="QuestionPane0"]/div[1]/div[2]/a[3]/div/div/div/span[1]/span
 # Answer circle labels: A, B, and C
 # Read how many questions there are i.e. track quiz progress
+# TODO: detect earned message at end of quiz
 def page_quiz(driver):
     # wait for presence of questions
     progress = driver.find_element_by_xpath(f"//*[@id='QuestionPane0']/div[2]").text
@@ -257,15 +264,21 @@ def page_quiz(driver):
 
         # /html/body/div[2]/main/ol/li[1]/div/div[2]/div/div[1]/div[2]/div[6]/a/div/span/input (Get score button)
         # /html/body/div[2]/main/ol/li[1]/div/div[2]/div[1]/div[1]/div[2]/div[6]/a/div/span/input (Next question button)
-        # "b_focusLabel wk_rewards_promo"
+        # webdriverwait vs find_element
         next = WebDriverWait(driver, 10).until(EC.visibility_of_element_located((By.XPATH, "/html/body/div[2]/main/ol/li[1]/div/div[2]/div[1]/div[1]/div[2]/div[6]/a/div/span/input")))
         next.click()
     
+    # is this needed?
     sleep(SHORT_WAIT)
-    score = WebDriverWait(driver, 10).until(EC.visibility_of_element_located((By.XPATH, "/html/body/div[2]/main/ol/li[1]/div/div[2]/div/div[1]/div[2]/div[6]/a/div/span/input")))
-    score.click()
+    #score = WebDriverWait(driver, 10).until(EC.visibility_of_element_located((By.XPATH, "/html/body/div[2]/main/ol/li[1]/div/div[2]/div/div[1]/div[2]/div[6]/a/div/span/input")))
+    #score.click()
 
-    header_message = driver.find_element_by_class_name("b_focusLabel wk_rewards_promo")
+    #header_message = driver.find_element_by_class_name("b_focusLabel wk_rewards_promo")
+    #header_message = WebDriverWait(driver, 10).until(EC.visibility_of_element_located((By.XPATH, "//*[@id='SummaryPane0']/div[1]/div[2]")))
+    print("before header page")
+    header_message = driver.find_element_by_xpath("//*[@id='SummaryPane0']/div[1]/div[1]")
+    print("after header page")
+    #sleep(3)
     print(header_message.text)
     sleep(120)
 
@@ -446,6 +459,10 @@ def poll_option(driver):
 # 3. Move all functions into a class object
 # 4. Move all common functions such as starting quiz and identifying tasks to other functions
 # 5. Use enums
+# 6. Transition to random json for searches
+# 7. Monthly task cards
+# 8. Extra: function to download drivers
+# can I use same queries for both mobile and pc?
 # Automate signing-up into microsoft account (optional)
 # End-game goal: AWS Lambda?
 if __name__=="__main__":
