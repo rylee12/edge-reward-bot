@@ -1,5 +1,4 @@
 import re
-from typing import ClassVar
 from selenium import webdriver
 from msedge.selenium_tools import Edge, EdgeOptions
 
@@ -22,6 +21,7 @@ from selenium.webdriver.support.wait import WebDriverWait
 
 # https://www.reddit.com/r/MicrosoftRewards/comments/6a7m5w/only_50_points_per_day_for_search/
 # Microsoft rewards has different levels. Levels determine how many points u earn
+# https://random-data-api.com/
 
 dashboard_url = "https://account.microsoft.com/rewards/"
 dashboard_url2 = "https://rewards.microsoft.com/"
@@ -248,6 +248,7 @@ def determine_task_card(driver, offer, title):
 # Answer circle labels: A, B, and C
 # Read how many questions there are i.e. track quiz progress
 # TODO: detect earned message at end of quiz
+# instead of earned message, just detect for any "ending" message
 def page_quiz(driver):
     # wait for presence of questions
     progress = driver.find_element_by_xpath(f"//*[@id='QuestionPane0']/div[2]").text
@@ -341,7 +342,7 @@ def get_current_progress(driver):
             if circle.get_attribute("class") == "filledCircle":
                 current_progress += 1
     
-    return current_progress
+    return current_progress  
 
 
 def get_progress_length(driver):
@@ -357,26 +358,43 @@ def multiple_answers(driver):
     sleep(SHORT_WAIT)
     element.click()
 
-    circles = driver.find_elements_by_xpath("//*[starts-with(@id, 'rqQuestionState')]")
-    current_progress = 0
+    progress_length = get_progress_length(driver)
 
-    # indicate which question user is currently on. Subtract by 1 to find out how many completed
-    if len(circles) > 0:
-        for circle in circles:
-            if circle.get_attribute("class") == "filledCircle":
-                current_progress += 1
+    while True:
+        if get_current_progress(driver) == progress_length:
+            header_message = driver.find_elements_by_class_name("headerMessage_Refresh")
+            if len(header_message) > 0:
+                print("quiz is done")
+                break
+            else:
+                print("supersonic not fast enuff")
 
+        answer_index = 0
 
-    progress = driver.find_element_by_class_name("btCorOps")
-    print(progress.text)
-    current, max = map(int, progress.text.split("/"))
+        try:
+            while True:
+                #answers = driver.find_elements_by_xpath("//*[starts-with(@id, 'rqAnswerOption')]")
+                #header_message = driver.find_elements_by_class_name("headerMessage_Refresh")
+                progress = driver.find_element_by_class_name("btCorOps")
+                print(progress.text)
+                current, goal = map(int, progress.text.split("/"))
 
-    answers = driver.find_elements_by_xpath("//*[starts-with(@id, 'rqAnswerOption')]")
-    #header_message = driver.find_elements_by_class_name("headerMessage_Refresh")
-    for answer in answers:
-        count = 0
-        answer.click()
-        sleep(2)    
+                if current == goal:
+                    print("fulfilled prophecy")
+                    break
+
+                print(f"prophecy is at: {current}")
+                answer = driver.find_element_by_id(f"rqAnswerOption{answer_index}")
+                if answer.get_attribute("iscorrectoption") == "True":
+                    answer.click()
+                    sleep(1)
+
+                answer_index += 1
+        except:
+            print("exception occurred")
+            print(f"current = {current}, goal = {goal}")
+        
+        sleep(SHORT_WAIT)
 
 
 
@@ -391,11 +409,13 @@ def multiple_choices(driver):
     print(len(choices))
 
     try:
+        # does this loop go beyond the number of choices?
         for number in range(0, len(choices)):
             question = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, f"rqAnswerOption{number}")))  
             question.click()
 
             sleep(SHORT_WAIT)
+            print(number)
 
             # check if header_message exists. If it doesn't, then loop again
             header_message = driver.find_elements_by_class_name("headerMessage_Refresh")
@@ -404,7 +424,7 @@ def multiple_choices(driver):
                 print(header_message)
                 print("anything in header message?")
                 print(header_message[0].text)
-    
+                #break
     except:
         print("Error happened")
 
@@ -461,6 +481,7 @@ def poll_option(driver):
 # 5. Use enums
 # 6. Transition to random json for searches
 # 7. Monthly task cards
+# 8. Determine which overlay tasks are not resetted i.e. can be started in-progress (this or that, supersonic quiz)
 # 8. Extra: function to download drivers
 # can I use same queries for both mobile and pc?
 # Automate signing-up into microsoft account (optional)
