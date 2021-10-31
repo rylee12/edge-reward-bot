@@ -7,6 +7,10 @@ activate.txt
 # C extensions
 *.so
 
+# Text files
+card_names.txt
+credentials.txt
+
 # Distribution / packaging
 .Python
 build/
