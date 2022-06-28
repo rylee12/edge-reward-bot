@@ -97,15 +97,29 @@ class BingRewardBot():
     def _setup_driver_options(self, mode):
         options = EdgeOptions()
         options.add_argument(profile_path)
+        options.add_argument("--user-data-dir=C:\\Users\\ryanl\\AppData\\Local\\Microsoft\\Edge\\User d")
         options.use_chromium = True
-        
+
+        options.add_argument("start-maximized")
+        options.add_argument("disable-infobars")
+        options.add_argument("--disable-extensions")
+
         if mode == "mobile":
             options.add_experimental_option("mobileEmulation", mobile_emulation)
         
         return options
 
-    def _sign_in(self):
-        pass
+    # microsoft automatically logs you in
+    # TODO: detect for profile or not?
+    # https://stackoverflow.com/questions/46878621/logging-into-microsoft-account-using-selenium
+    def sign_in(self):
+        driver = self._create_driver("desktop")
+        #driver.get(dashboard_url)
+        driver.get("https://login.live.com/login.srf")
+        WebDriverWait(driver, 10).until(EC.element_to_be_clickable(By.ID, "io116")).send_keys("ryan.lee1319@outlook.com")
+        sleep(30)
+        WebDriverWait(driver, 10).until(EC.element_to_be_clickable(By.ID, "io118")).send_keys("password")
+
 
     # create driver later or store in object
     def check_points_iframe(self):
@@ -136,6 +150,7 @@ class BingRewardBot():
     # class = title-detail
     # points: //*[@id="userPointsBreakdown"]/div/div[2]/div/div[1]/div/div[2]/mee-rewards-user-points-details/div/div/div/div/p[2]
     # how to get current browser tab position
+    # TODO: return boolean or dictionary of search queries and the max points for each query type
     def check_points_dashboard(self):
         driver = self._create_driver("desktop")
         driver.get(self._dashboard_points_url)
@@ -145,10 +160,18 @@ class BingRewardBot():
             title = i.find_element_by_xpath("./div/div[2]/mee-rewards-user-points-details/div/div/div/div/p[1]")
             points = i.find_element_by_xpath("./div/div[2]/mee-rewards-user-points-details/div/div/div/div/p[2]")
             print(title.text)
+            if title.text.startswith("PC"):
+                print("PC titles")
             print(points.text)
 
+    # block of code for signing into bing rewards program for first time
+    def _rewards_sign_in(self, driver):
+        sign_in = driver.find_elements_by_id("raf-signin-link-id")
+        if len(sign_in) > 0:
+            sign_in[0].click()
+            sleep(3)
+            
 
-    # should we include an edge search?
     # how to decide list of words to query?
     def desktop_search(self):
         driver = self._create_driver("desktop")
@@ -159,18 +182,14 @@ class BingRewardBot():
         driver.quit()
 
     def mobile_search(self):
-        #options = self._setup_driver_options("mobile")
-
-        #driver = webdriver.Chrome(executable_path=msedge_path, options=options)
         driver = self._create_driver("mobile")
         
         for item in mobile_words:
             driver.get(f"https://www.bing.com/search?q={item}")
+            sleep(0.3)
         
         driver.quit()
 
-    def edge_search(self):
-        pass
 
     # detect check mark or other?
     # checked icon class: "mee-icon mee-icon-SkypeCircleCheck"
@@ -180,12 +199,7 @@ class BingRewardBot():
         driver.get(self._dashboard_url)
         sleep(2)
 
-        # block of code for signing into bing rewards program for first time
-        # make into function
-        sign_in = driver.find_elements_by_id("raf-signin-link-id")
-        if len(sign_in) > 0:
-            sign_in[0].click()
-            sleep(2)
+        self._rewards_sign_in(driver)
 
         # differentiate between title and task_title
         for task_number in range(1, 4):
@@ -200,15 +214,42 @@ class BingRewardBot():
             # //*[@id="daily-sets"]/mee-card-group[1]/div/mee-card[2]/div
             if checked.get_attribute("class") == "mee-icon mee-icon-AddMedium" or checked.get_attribute("class") == "mee-icon mee-icon-HourGlass":
                 self._determine_task(driver, offer, task_title)
-            else:
-                print("false (get rid of else statement)")
 
         sleep(5)
 
     # indiv card xpath: //*[@id="more-activities"]/div/mee-card[1]/div/card-content/mee-rewards-more-activities-card-item/div
+    # TODO: count number of cards using find elements by (class, xpath?)
     # use * for number?
-    def more_activities(self, driver):
-        current_url = driver.current_url
+    def more_activities(self):
+        driver = self._create_driver("desktop")
+
+        driver.get(self._dashboard_url)
+        sleep(2)
+
+        self._rewards_sign_in(driver)
+
+        more_activties = driver.find_element_by_xpath("//*[@id='more-activities']/div")
+        cards = more_activties.find_elements_by_xpath("./mee-card")
+
+        # loop through task cards and determine if there are points to earn
+        for i in range(1, len(cards) + 1):
+            offer = driver.find_element_by_xpath(f"//*[@id='more-activities']/div/mee-card[{i}]/div/card-content/mee-rewards-more-activities-card-item/div")
+            title = offer.find_element_by_xpath("./a/div[2]/h3")
+
+            checked = offer.find_elements_by_xpath("./a/mee-rewards-points/div/div/span[1]")
+
+            # if there is no check or plus symbol, there are no points to earn from that activity card
+            if len(checked) > 0:
+                checked = checked[0]
+            else:
+                continue
+
+            task_title = title.text.lower().strip()
+
+            if checked.get_attribute("class") == "mee-icon mee-icon-AddMedium" or checked.get_attribute("class") == "mee-icon mee-icon-HourGlass":
+                self._determine_task(driver, offer, task_title)
+        
+        sleep(5)
 
     def _determine_task(self, driver, offer, title):
         link = offer.find_element_by_xpath("./a/div[3]/span")
@@ -252,47 +293,46 @@ class BingRewardBot():
         driver.close()
         driver.switch_to.window(driver.window_handles[0])
     
+    # TODO: sleep needed?
     def _start_quiz(self, driver):
-        start_button = WebDriverWait(driver, 10).until(EC.visibility_of_element_located((By.ID, "rqStartQuiz"))) # start button
+        try:
+            start_button = WebDriverWait(driver, self._LONG_WAIT).until(EC.visibility_of_element_located((By.ID, "rqStartQuiz")))
 
-        sleep(self._SHORT_WAIT)
-        start_button.click()
+            sleep(self._SHORT_WAIT)
+            start_button.click()
+        except:
+            # selenium.common.exceptions.TimeoutException i.e. timeout exception
+            print("starting button not present")
 
     # solve this or that task
     def _solve_this_or_that(self, driver):
-        element = WebDriverWait(driver, 10).until(EC.visibility_of_element_located((By.ID, "rqStartQuiz"))) # start button
-
-        sleep(self._SHORT_WAIT)
-        element.click()
+        self._start_quiz(driver)
 
         # wait for btoptions to load?
         while True:
             progress = WebDriverWait(driver, 10).until(EC.visibility_of_element_located((By.CLASS_NAME, "bt_Quefooter"))).text
             current, max = map(int, progress.split(" of "))
 
-            # randint() or choice()
             number = random.randint(0, 1)
             driver.find_element_by_id(f"rqAnswerOption{number}").click()
             sleep(self._SHORT_WAIT)
 
             if current == max:
-                print("end")
                 header_message = WebDriverWait(driver, 10).until(EC.visibility_of_element_located((By.CLASS_NAME, "headerMessage_Refresh")))
-                print(header_message)
-                print("anything in header message?")
 
                 # get points from rqPoints element or from header message element
+                # TODO: why do we want points?
                 try:
                     print(header_message.text)
                     points = driver.find_element_by_class_name("rqECredits").text
                     limit = driver.find_element_by_class_name("rqMCredits").text
                     print(f"points = {points}, limit = {limit}")
                 except:
-                    print("failure")
+                    print("failure in solve this or that quiz")
 
                 break
 
-    # solve tasks with quiz questions on page panel
+    # solve quizzes that are on page panel instead of overlay
     # TODO: detect earned message at end of quiz
     # instead of earned message, just detect for any "ending" message
     def _page_panel_quiz(self, driver):
@@ -339,10 +379,7 @@ class BingRewardBot():
 
     # solve overlay quizzes that require user to select multiple answers (up to 5)
     def _multiple_answers_quiz(self, driver):
-        element = WebDriverWait(driver, 10).until(EC.visibility_of_element_located((By.ID, "rqStartQuiz"))) # start button
-
-        sleep(self._SHORT_WAIT)
-        element.click()
+        self._start_quiz(driver)
 
         progress_length = self._get_total_circles(driver)
 
@@ -459,11 +496,21 @@ class BingRewardBot():
 # 8. Extra: function to download drivers
 # can I use same queries for both mobile and pc?
 # Automate signing-up into microsoft account (optional)
-# End-game goal: AWS Lambda?
+
+# NEW TODO problem list:
+# 1. Not all searches registering properly -> experiment with sleep times
+# 2. Sign-in or not depends on edge settings, need to account for all of it
+# 3. multiple answers quiz (supersonic quiz) fails if you start at middle of quiz i.e. 2nd or 3rd question and no start buttons to click
+# EXTENSION: experiment with all overlay quizzes restarting
+# 4. make it so the functions attempt to re-try and they fail 
+#   - solutions: timer? attempt counter?
 if __name__=="__main__":
     object1 = BingRewardBot()
-    object1.desktop_search()
-    object1.mobile_search()
-    object1.daily_tasks()
-    #object1.check_points_dashboard()
+    #object1.desktop_search()
+    #object1.mobile_search()
+    #object1.daily_tasks()
+    #object1.more_activities()
+
+    #object1.sign_in()
+    object1.check_points_dashboard()
     #object1.check_points_iframe()
